@@ -1,0 +1,178 @@
+library(quantmod)
+library(ggplot2)
+library(ggfortify)
+require(gridExtra)
+install.packages("histogram")
+require(histogram)
+theme_set(theme_bw())
+
+# 3.6
+getSymbols('^OEX',src='yahoo', from = '2007-01-03', to = '2018-01-03')
+tail(OEX)
+plot(OEX[,4])
+OEX$OEX.Close
+
+# Plot 
+autoplot(OEX$OEX.Close) + 
+  labs(title="S&P 100 Closing Prices", y = "Price", x = "Year") + 
+  theme(plot.title = element_text(hjust=0.5)) 
+  
+  
+# Tjek normalfordeling
+getSymbols('^OEX',src='yahoo', return.class = 'matrix', from = '2018-01-01', to = '2018-04-01')
+
+log.value <- log(OEX[,4])
+log.ret <- rep(NA, length(OEX[,4])-1)
+
+for (i in 2:length(OEX[,4])) {
+  log.ret[i-1] <- log(OEX[[i,4]]/OEX[[i-1,4]])
+}
+
+log.ret.data <- data.frame(log.ret)
+
+
+qqplot.data <- function (vec) { 
+  y <- quantile(vec[!is.na(vec)], c(0.25, 0.75))
+  x <- qnorm(c(0.25, 0.75))
+  slope <- diff(y)/diff(x)
+  int <- y[1L] - slope * x[1L]
+
+  d <- data.frame(resids = vec)
+
+  ggplot(d, aes(sample = resids)) + stat_qq() + geom_abline(slope = slope, intercept = int) +
+    labs(title = "QQ-plot for log return")
+}
+
+
+qq1 <- qqplot.data(log.value)
+
+qq2 <- qqplot.data(log.ret)
+
+
+hist1 <- (ggplot(data=OEX, aes(log(OEX$OEX.Close)), geom="histogram") + 
+  geom_histogram(aes(y = ..density..), breaks=seq(7.025, 7.150, by = 0.01), col="black", fill="grey") + 
+  geom_density(col=2) +
+  labs(title="Histogram for log value") +
+  labs(x="Log value", y = "Count"))
+
+hist2 <- (ggplot(data=log.ret.data, aes(log.ret.data$log.ret), geom="histogram") + 
+  geom_histogram(aes(y = ..density..), breaks=seq(-0.05, 0.025, by = 0.005), col="black", fill="grey") + 
+  geom_density(col=2) +
+  labs(title="Histogram for logaritmic return") +
+  labs(x="Log return", y="Count"))
+
+
+# Arrange the four plots 
+grid.arrange(hist1, hist2, qq1, qq2)
+
+shapiro.test(log.value)
+
+# Data uden 5% og 95% outliers
+remove_outliers <- function(x, na.rm = TRUE) {
+  qnt <- quantile(x, probs=c(.05, .95), na.rm = na.rm)
+  H <- 1.5 * IQR(x, na.rm = na.rm)
+  y <- x
+  y[x < (qnt[1] - H)] <- NA
+  y[x > (qnt[2] + H)] <- NA
+  y <- y[!is.na(y)]
+  y
+}
+z <- remove_outliers(log.ret)
+shapiro.test(z)
+
+z2 <- remove_outliers(log.value)
+shapiro.test(z2)
+?shapiro.test
+
+# Data uden 25% og 75% outliers
+x <- log.ret[!log.ret %in% boxplot.stats(log.ret)$out]
+qqplot.data(x)
+shapiro.test(x)
+
+
+
+getSymbols('^OEX',src='yahoo', return.class = 'ts', from = '2014-02-30', to = '2016-01-30')
+
+
+u <- rep(NA, length(OEX[,4])-1)
+
+
+for (i in 2:length(OEX[,4])) {
+  u[i-1] <- log(OEX[[i,4]]/OEX[[i-1,4]])
+}
+
+qqnorm(u); qqline(u)
+
+shapiro.test(u)
+
+hist(u, breaks = 20)
+
+
+
+# S&P 100 ticker: ^OEX
+
+getSymbols('^OEX',src='yahoo', from = '2008-01-01', to = '2018-01-01')
+
+OEX
+
+n <- length(OEX[,4])
+T_ = n/252
+dt <- 1/252
+
+plot(OEX[,4])
+
+
+## 3.8
+
+u <- rep(NA, length(OEX[,4])-1)
+si <- rep(NA, length(OEX[,4])-1)
+sit <- rep(NA, length(OEX[,4])-1)
+
+for (i in 2:length(OEX[,4])) {
+  u[i-1] <- log(OEX[[i,4]]/OEX[[i-1,4]])
+  si[i] <- OEX[[i-1,4]]
+  sit[i] <- OEX[[i,4]]
+}
+
+
+
+
+loglike <- function(pars, si. = si, sit. = sit) {
+  mu <- pars[1]
+  sigma2 <- pars[2]^2
+  val.log.like <- n/2*log(2*pi) + n/2*log(sigma2*dt) + 1/(2*sigma2*dt) * sum((log(sit./si.)-(mu-sigma2/2)*dt)^2)
+  return(val.log.like)
+}
+opti <- optim( c(0.1, 0.5), loglike)
+opti
+
+
+sigma_hat <- sqrt(1/T_ * sum(u^2))
+mu_hat <- (log(OEX[[n,4]]/OEX[[1,4]]) + sigma_hat^2/2)/T_
+
+sigma_hat
+mu_hat
+
+
+## 3.9
+
+getSymbols('^OEX',src='yahoo', from = "2011-01-01", to = '2018-01-01')
+
+n <- length(OEX[,4])
+T_ <- n/252 # 251 obs pr år
+
+u <- rep(NA, length(OEX[,4])-1)
+for (i in 2:length(OEX[,4])) {
+  u[i-1] <- log(OEX[[i,4]]/OEX[[i-1,4]])
+}
+
+sigma_hat_2011 <- sqrt(1/T_ * sum(u^2))
+sigma_hat_2011
+
+mu_hat_2011 <- 1/T_ * log(OEX[[n,4]]/OEX[[1,4]]) + sigma_hat_2011^2/2
+mu_hat_2011
+
+'Højere mu og lavere sigma ved data efter 2010 end ved data fra 2007 - også forventet ud fra grafen'
+
+
+
