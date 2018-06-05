@@ -2,7 +2,6 @@ library(quantmod)
 library(ggplot2)
 library(ggfortify)
 require(gridExtra)
-install.packages("histogram")
 require(histogram)
 theme_set(theme_bw())
 
@@ -40,7 +39,7 @@ qqplot.data <- function (vec) {
   d <- data.frame(resids = vec)
 
   ggplot(d, aes(sample = resids)) + stat_qq() + geom_abline(slope = slope, intercept = int) +
-    labs(title = "QQ-plot for log return")
+    labs(title = "QQ-plot af logaritmisk afkast")
 }
 
 
@@ -52,13 +51,13 @@ qq2 <- qqplot.data(log.ret)
 hist1 <- (ggplot(data=OEX, aes(log(OEX$OEX.Close)), geom="histogram") + 
   geom_histogram(aes(y = ..density..), breaks=seq(7.025, 7.150, by = 0.01), col="black", fill="grey") + 
   geom_density(col=2) +
-  labs(title="Histogram for log value") +
+  labs(title="Histogram af logaritmisk værdi") +
   labs(x="Log value", y = "Count"))
 
 hist2 <- (ggplot(data=log.ret.data, aes(log.ret.data$log.ret), geom="histogram") + 
   geom_histogram(aes(y = ..density..), breaks=seq(-0.05, 0.025, by = 0.005), col="black", fill="grey") + 
   geom_density(col=2) +
-  labs(title="Histogram for logaritmic return") +
+  labs(title="Histogram for logaritmisk afkast") +
   labs(x="Log return", y="Count"))
 
 

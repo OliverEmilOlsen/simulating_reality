@@ -15,7 +15,7 @@ sigma_r <- 0.01
 rho <- -0.15
 lambda <- -0.23
 sigma_s <- 0.2
-mu <- 0.09
+mu <- 0.06
 B_vas <- (1 / a) * (1 - exp(-a * 1:10))
 x_ij <- rep(1/10, 10)
 
@@ -49,7 +49,7 @@ VasicekZCBprice <- function(r0, a, b, sigma_r, lambda, t, T){
   return(exp(a_vas-b_vas*r0))
 }
 
-L(1:121)
+
 
    
 # Uden hedging  
@@ -75,14 +75,18 @@ for (i in 1:121) {
 meanvector_A
 
 
-
 L <- function(i) {
   VasicekZCBprice(r0 = r[i,j], a = a, b = b, sigma_r = sigma_r, lambda = lambda, t = (i-1)/12, T=10)*L_T
 }
 
+L(1:121)
+
+## P(A(T) < L(T)) ##
+1 - sum(A[121,] > L(121))/10000
 
 
-### Plot 6.3 ###
+
+### Plots over aktivernes værdiudvikling samt fordelinger  ###
 qs <- apply(A, 1, quantile, probs=c(0.005, 0.5, 0.995))
 quantiles<-t(rbind(qs,meanvector_A))
 colnames(quantiles)<-c("0.5%","50%", "99.5%","Mean")
@@ -109,14 +113,14 @@ data_plot_6.32<- melt(data_plot_6.32,  id = c('time'))
 
 plot_6.32 <- ggplot(data_plot_6.32, aes(time, value)) +
   geom_line(aes(colour = variable)) +
-  ggtitle("50% aktier, 50% obligationer, 0 i banken")
+  ggtitle("10% aktier, 90% obligationer, 0 i banken")
 
 plot_6.32+scale_color_hue(labels = c("0.5%","50%", "99.5%","Mean"))
 
 asset_dist2 <- data.frame(year = factor(rep(c("1","3","6","10"), each=n)), 
                          value = c(A[13,], A[37,], A[73,], A[121,]))
 asset_plot2 <- ggplot(asset_dist2, aes(x=value, fill=year)) + geom_density(alpha=.3) +
-  ggtitle("50% aktier, 50% obligationer, 0 i banken")
+  ggtitle("10% aktier, 90% obligationer, 0 i banken")
 
 
 
@@ -158,7 +162,7 @@ grid.arrange(asset_plot1, asset_plot2, asset_plot3, asset_plot4)
 
 
 # Med ZCB-hedging  
-A[1,] <- 1000 - L(0)
+A[1,] <- 1000 - L(1)
 
 for(j in 1:n){
   z1 <- rnorm(m+1,0,1)
@@ -175,7 +179,7 @@ for(j in 1:n){
 
 for(j in 1:n){
   for(i in 1:(m+1)){
-    A[i,j] <- A[i,j] + L(i-1) 
+    A[i,j] <- A[i,j] + L(i) 
   }
 }
 
@@ -209,8 +213,8 @@ grid.arrange(plot_zcbhedge, asset_plot_zcbh)
 # Med ZC swap-hedging  
 A[1,] <- 1000
 
-L_matrix <- matrix(NA, m+1, n)
-L_matrix[1,] <- L(1)*r0*dt 
+payments <- matrix(NA, m+1, n)
+payments[1,] <- L(1)*r0*dt 
 
 for(j in 1:n){
   z1 <- rnorm(m+1,0,1)
@@ -221,22 +225,20 @@ for(j in 1:n){
     r[i,j] <- r[i-1,j] + dr
     dA <- A[i-1,j]*(x_beta * r[i-1,j] * dt + xS * (mu*dt + sigma_s*sqrt(dt)*z3[i-1]) + 
                       sum(x_ij * xB * ((r[i-1,j] - lambda * sigma_r * B_vas) * dt - sigma_r * B_vas * sqrt(dt) * z1[i-1])))
-    L_matrix[i,j] <- L(1)*dt*r[i-1,j]
-    A[i,j] <- A[i-1,j] + dA - L_matrix[i,j]
+    payments[i,j] <- L(1)*dt*r[i-1,j]
+    A[i,j] <- A[i-1,j] + dA - payments[i,j]
   }
 }
 
-
+L_matrix <- matrix(NA, m+1, n)
 
 for(j in 1:n){
   A[1,j] <- 1000 + L(1)
-  L_matrix[1,j] <- L_matrix[1,] <- L(1)*r0*dt + 2*VasicekZCBprice(r0 = r0, a = a, b = b, sigma_r = sigma_r, 
+  L_matrix[1,j] <- L_matrix[1,] <- 2*VasicekZCBprice(r0 = r0, a = a, b = b, sigma_r = sigma_r, 
                                                                 lambda = lambda, t = 0, T=10)*L_T 
   for(i in 2:(m+1)){
     A[i,j] <- A[i,j] + L(i)
-    L_matrix[i,j] <- VasicekZCBprice(r0 = r[i-1,j], a = a, b = b, sigma_r = sigma_r, 
-                                     lambda = lambda, t = (i-1)/12, T=10)*L_T + 
-      VasicekZCBprice(r0 = r0, a = a, b = b, sigma_r = sigma_r, lambda = lambda, t = 0, T=10)*L_T
+    L_matrix[i,j] <- L(i) + VasicekZCBprice(r0 = r0, a = a, b = b, sigma_r = sigma_r, lambda = lambda, t = 0, T=10)*L_T
   }
 }
 
@@ -252,7 +254,6 @@ meanvector_L <- rep(NA, 121)
 for (i in 1:121) {
   meanvector_L[i] <- mean(L_matrix[i,])
 }
-
 meanvector_L
 
 
@@ -262,7 +263,6 @@ for (j in 1:n) {
     B_swap[i,j] <- pmax(A[i,j] - L_matrix[i,j], 0)
   }
 }
-
 
 
 
@@ -283,7 +283,7 @@ meanvector_Loss_swap
 
 
 qs <- apply(Loss_swap, 1, quantile, probs=c(0.005, 0.5, 0.995))
-quantiles<-t(rbind(qs,meanvector_Loss_swap))
+quantiles <- t(rbind(qs,meanvector_Loss_swap))
 
 SCR_swap <- quantiles[,3]
 
@@ -296,7 +296,7 @@ for (j in 1:n) {
   }
 }
 
-CR_swap[2,]
+CR_swap[1,]
 meanvector_CR <- rep(NA, 109)
 for (i in 1:109) {
   meanvector_CR[i] <- mean(CR_swap[i,])
@@ -305,9 +305,6 @@ for (i in 1:109) {
 
 
 true_false_matrix_swap <- CR_swap < 1
-true_false_matrix_swap[100,]
-
-
 
 for (j in 1:n) {
   for (i in 1:109) {
@@ -318,6 +315,15 @@ for (j in 1:n) {
 }
 
 sum(true_false_matrix_swap[2,])
+
+insolv_prob <- rep(NA, 109)
+for (i in 1:109) {
+  insolv_prob[i] <- sum(true_false_matrix_swap[i,])/n  
+}
+
+ins_prob_plot <- qplot(time_vector, insolv_prob, xlab = "Tid",
+                       ylab = "Sandsynlighed for insolvens", main = "Sandsynlighed for insolvens for ZCB-swap hedge")
+
 
 
 
@@ -340,9 +346,6 @@ plot_L <- ggplot(data_plot_L, aes(time, value)) +
   geom_line(aes(colour = variable)) +
   theme(legend.position = "none")
 plot_L
-
-## P(A(T) < L(T)) ##
-1 - sum(A[121,] > L(121))/10000
 
 
 # Bonus
@@ -379,7 +382,7 @@ data_plot_6.6<- melt(data_plot_6.6,  id = c('time'))
 
 plot_6.6 <- ggplot(data_plot_6.6, aes(time, value)) +
   geom_line(aes(colour = variable)) +
-  ggtitle("Fraktilplot for B(t) med ZCB-hedge")
+  ggtitle("Fraktilplot for B(t)")
 
 plot_6.6+scale_color_hue(name = "Fraktiler",labels = c("0.5%","50%", "99.5%","Mean"))
 
@@ -408,8 +411,10 @@ quantiles<-t(rbind(qs,meanvector_Loss))
 
 SCR <- quantiles[,3]
 
-CR <- matrix(NA, 109, n)
+plot_SCR <- qplot(time_vector, SCR, xlab = "Tid", ylab = "SCR", main = "Solvenskapitalkrav")
 
+
+CR <- matrix(NA, 109, n)
 
 for (j in 1:n) {
   for (i in 1:109) {
@@ -417,7 +422,7 @@ for (j in 1:n) {
   }
 }
 
-CR[1,]
+
 meanvector_CR <- rep(NA, 109)
 for (i in 1:109) {
   meanvector_CR[i] <- mean(CR[i,])
@@ -437,10 +442,10 @@ data_plot_CR<- melt(data_plot_CR,  id = c('time'))
 
 plot_CR <- ggplot(data_plot_CR, aes(time, value)) +
   geom_line(aes(colour = variable)) +
-  ggtitle("Quantile plot")
+  ggtitle("Fraktilplot af CR(t)") +
+  scale_color_hue(name = "Quantiles",labels = c("0.5%","50%", "99.5%","Mean"))
 
-plot_CR+scale_color_hue(name = "Quantiles",labels = c("0.5%","50%", "99.5%","Mean"))
-
+plot_CR
 
 
 
@@ -458,17 +463,19 @@ for (j in 1:n) {
   }
 }
 
-sum(true_false_matrix[109,])
 
 
-time_vector <- seq(dt, T, by = dt)
-data_plot <- data.frame('time' = time_vector, "Value" = CR[1:50,])
-data_plot <- melt(data_plot,  id = c('time'))
-plot_CR <- ggplot(data_plot, aes(time, value)) +
-  geom_line(aes(colour = variable)) +
-  theme(legend.position = "none")
-plot_CR
+insolv_prob <- rep(NA, 109)
+for (i in 1:109) {
+  insolv_prob[i] <- sum(true_false_matrix[i,])/n  
+}
 
+ins_prob_plot <- qplot(time_vector, insolv_prob, xlab = "Tid",
+                    ylab = "Sandsynlighed for insolvens", main = "Sandsynlighed for insolvens")
+
+
+
+grid.arrange(plot_6.6, plot_SCR, plot_CR, ins_prob_plot)
 
 
 

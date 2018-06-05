@@ -8,25 +8,23 @@
 #'
 #' @return matrix containing simulated paths in each column (numeric matrix)
 
-simulate_asian_put <- function(x0, mu, sigma, n_sim, time_vector) {
-  
-  n_time  <- length(time_vector) # number of time points
-  
-  simulated_paths <- matrix(NA, n_time, n_sim)
-  simulated_paths[1,] <- x0
+simulate_asian_put <- function(S0, K, sigma, r, n_sim, T) {
+  dt = 1/200
+  simulated_paths <- simulated_paths2 <- matrix(NA, 200*T, n_sim)
+  simulated_paths[1,] <- simulated_paths2[1,] <- S0
   riemann_value <- c(NA, n_sim)
-  asianputprice <- c(NA, n_sim)
+  asiancallprice <- c(NA, n_sim)
   
   for (k in 1:n_sim) {
-    for (i in 2:n_time) {
-      dx <- mu * simulated_paths[i - 1, k] * dt + simulated_paths[i - 1, k] * sigma * sqrt(dt) * rnorm(1)
-      simulated_paths[i, k] <- simulated_paths[i - 1, k] + dx
+    for (i in 2:(200*T)) {
+      z1 <- rnorm(1)
+      z2 <- -z1
+      simulated_paths[i, k] <- simulated_paths[i - 1, k] * exp((r-0.5*sigma^2)*dt + sigma * sqrt(dt) * z1)
+      simulated_paths2[i, k] <- simulated_paths2[i - 1, k] * exp((r-0.5*sigma^2)*dt + sigma * sqrt(dt) * z2)
     }
-    riemann_value[k] <- sum(simulated_paths[,k]*dt)
-    asianpriceprice[k] <- exp(-r*(T))*pmax(K-riemann_value[k],0)
+    riemann_value[k] <- 1/2*(pmax(K-mean(simulated_paths[,k]),0) + pmax(K-mean(simulated_paths2[,k]),0))
+    asiancallprice[k] <- exp(-r*(T))*riemann_value[k]
   }
-  
-  price <- mean(asianputprice)
-  
+  price <- mean(asiancallprice)
   return(price)
 }

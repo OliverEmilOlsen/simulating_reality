@@ -182,7 +182,10 @@ grid.arrange(BSvsOBSput_eu, BSvsOBSput_eu_q, BSvsOBSput_us, BSvsOBSput_us_q)
 
 
 
+
+
 ##### Implied volatility #####
+
 implied.vol <- function(S0, K, T, r, market){
     sigma <- sigma_hat
     sig.up <- 1
@@ -190,7 +193,6 @@ implied.vol <- function(S0, K, T, r, market){
     count <- 0
     err <- bscall(S0, K, T, r, sigma, q = 0) - market 
     
-    ## repeat until error is sufficiently small or counter hits 1000
     while(abs(err) > 0.0001 && count<100000){
       if(err < 0){
         sig.down <- sigma
@@ -203,7 +205,6 @@ implied.vol <- function(S0, K, T, r, market){
       count <- count + 1
     }
     
-    ## return NA if counter hit 1000
     if(count==100000){
       return(NA)
     }
@@ -212,47 +213,235 @@ implied.vol <- function(S0, K, T, r, market){
     }
 }
 
-implied.vol(S0 = 100, K = 80, T = 5, r = 0.05, market = 25)
+
+S0 <- GSPC[[n,4]]
+T = 2/12
+r = mu_hat
+
+impvol_eu_call <- rep(NA, 73)
 
 
+for(i in 1:73){
+  impvol_eu_call[i] <- implied.vol(S0 = S0, K = strike[i], T = T, r = r, market = obs_prices_eu[i,2])
+}
+
+
+impvol_plot1 <- qplot(strike, impvol_eu_call, xlab = "Strike", ylab = "Volatilitet", 
+                      main = "Implied Volatility EU-call") + xlim(2600, 3300)
+
+
+
+implied.vol <- function(S0, K, T, r, market){
+  sigma <- sigma_hat
+  sig.up <- 1
+  sig.down <- 0.001
+  count <- 0
+  err <- bsput(S0, K, T, r, sigma, q = 0) - market 
+  
+  while(abs(err) > 0.0001 && count<100000){
+    if(err < 0){
+      sig.down <- sigma
+      sigma <- (sig.up + sigma)/2
+    }else{
+      sig.up <- sigma
+      sigma <- (sig.down + sigma)/2
+    }
+    err <- bsput(S0, K, T, r, sigma, q = 0) - market
+    count <- count + 1
+  }
+  
+  if(count==100000){
+    return(NA)
+  }
+  else{
+    return(sigma)
+  }
+}
 
 
 S0 <- SPY[[n,4]]
 T = 12.7/12
 r = mu_hat
-impvol_us_call <- rep(NA, 51)
-impvol_eu_call <- rep(NA, 51)
 
-for(i in 1:51){
-  impvol_us_call[i] <- implied.vol(S0 = S0, K = strike[i], T = T, r = r, market = obs_prices_us[i,2])
+
+impvol_us_put <- rep(NA, 59)
+for(i in 1:59){
+  impvol_us_put[i] <- implied.vol(S0 = S0, K = strike2[i], T = T, r = r, market = obs_prices_us2[i,2])
 }
 
-qplot(strike, impvol_us_call, xlab = "Strike", ylab = "Volatilitet") + xlim(300,400)
+impvol_plot2 <- qplot(strike2, impvol_us_put, xlab = "Strike", ylab = "Volatilitet", main = "Implied Volatility US-put")
+
+grid.arrange(impvol_plot1, impvol_plot2)
 
 
-S0 <- GSPC[[n,4]]
-T = 2/12
-r = mu_hat
-for(i in 1:73){
-  impvol_eu_call[i] <- implied.vol(S0 = S0, K = strike[i], T = T, r = r, market = obs_prices_eu[i,2])
+
+
+#### Asiatiske vs europæiske optioner ####
+
+S0 <- 100
+K <- 80
+r <- 0.06
+sigma <- 0.2
+T <- 1
+n_sim <- 5000
+
+simulate_asian_call(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+sim_european_call(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+
+
+##### Calls #####
+
+#### Ændringer i T ####
+T_changes <- c(0.3, 0.5, 1, 2, 3, 5)
+price_vec_EU1 <- rep(NA, 6)
+price_vec_AS1 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec_EU1[i] <- sim_european_call(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T_changes[i])
+  price_vec_AS1[i] <- simulate_asian_call(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T_changes[i])
 }
 
-qplot(strike, impvol_eu_call, xlab = "Strike", ylab = "Volatilitet") + xlim(2450,2800)
+callplot1 <- qplot(price_vec_EU1, price_vec_AS1, xlab = "Pris på europæisk call", ylab = "Pris på asiatisk call",
+                   main = "Ændring i T") 
 
 
-bla <- function(sigma1) {
-  for (i in 1:73) {
-    bscall(S0 = GSPC[[n,4]], K = strike[i], r = mu_hat, T = 2/12, sigma = sigma1, q = 0) - obs_prices_eu[i,2]
-  }
+#### Ændringer i S(0) ####
+S0_changes <- c(50, 80, 100, 120, 150, 200)
+price_vec_EU2 <- rep(NA, 6)
+price_vec_AS2 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec_EU2[i] <- sim_european_call(S0 = S0_changes[i], K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+  price_vec_AS2[i] <- simulate_asian_call(S0 = S0_changes[i], K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
 }
 
+callplot2 <- qplot(price_vec_EU2, price_vec_AS2, xlab = "Pris på europæisk call", ylab = "Pris på asiatisk call",
+                   main = "Ændring i S(0)") 
 
-bisect(bla, 0, 1)
 
-'Ingen lukket form løsn for asiatisk opt - Monte Carlo er genialt. 
-Pris på eur call > asiatisk call 
-Pris afh positivt af volatiliteten. Se Black_Scholes. 
-Volatilitet af asiatisk er mindre end eur.
+#### Ændringer i r ####
+r_changes <- c(-0.15, 0, 0.01, 0.1, 0.3, 0.7)
+price_vec_EU3 <- rep(NA, 6)
+price_vec_AS3 <- rep(NA, 6)
 
-Observationer af priser er under P'
+for (i in 1:6){
+  price_vec_EU3[i] <- sim_european_call(S0 = S0, K = K, sigma = sigma, r = r_changes[i], n_sim = n_sim, T = T)
+  price_vec_AS3[i] <- simulate_asian_call(S0 = S0, K = K, sigma = sigma, r = r_changes[i], n_sim = n_sim, T = T)
+}
+
+callplot3 <- qplot(price_vec_EU3, price_vec_AS3, xlab = "Pris på europæisk call", ylab = "Pris på asiatisk call",
+                   main = "Ændring i r")
+
+
+#### Ændringer i sigma ####
+sigma_changes <- c(0.1, 0.15, 0.2, 0.25, 0.3, 0.35)
+price_vec_EU4 <- rep(NA, 6)
+price_vec_AS4 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec_EU4[i] <- sim_european_call(S0 = S0, K = K, sigma = sigma_changes[i], r = r, n_sim = n_sim, T = T)
+  price_vec_AS4[i] <- simulate_asian_call(S0 = S0, K = K, sigma = sigma_changes[i], r = r, n_sim = n_sim, T = T)
+}
+
+callplot4 <- qplot(price_vec_EU4, price_vec_AS4, xlab = "Pris på europæisk call", ylab = "Pris på asiatisk call",
+                   main = "Ændring i sigma") 
+
+
+grid.arrange(callplot1, callplot2, callplot3, callplot4)
+
+
+
+
+
+##### Puts #####
+
+
+S0 <- 100
+K <- 120
+r <- 0.06
+sigma <- 0.2
+T <- 1
+n_sim <- 5000
+
+
+
+
+#### Ændringer i T ####
+T_changes <- c(0.3, 0.5, 1, 2, 3, 5)
+price_vec2_EU1 <- rep(NA, 6)
+price_vec2_AS1 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec2_EU1[i] <- sim_european_put(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T_changes[i])
+  price_vec2_AS1[i] <- simulate_asian_put(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T_changes[i])
+}
+
+putplot1 <- qplot(price_vec2_EU1, price_vec2_AS1, xlab = "Pris på europæisk put", ylab = "Pris på asiatisk put",
+                   main = "Ændring i T") 
+
+
+#### Ændringer i S(0) ####
+S0_changes <- c(50, 80, 90, 100, 150, 200)
+price_vec2_EU2 <- rep(NA, 6)
+price_vec2_AS2 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec2_EU2[i] <- sim_european_put(S0 = S0_changes[i], K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+  price_vec2_AS2[i] <- simulate_asian_put(S0 = S0_changes[i], K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+}
+
+putplot2 <- qplot(price_vec2_EU2, price_vec2_AS2, xlab = "Pris på europæisk put", ylab = "Pris på asiatisk put",
+                   main = "Ændring i S(0)") 
+
+
+#### Ændringer i r ####
+r_changes <- c(0.01, 0.05, 0.1, 0.15, 0.2, 0.3)
+price_vec2_EU3 <- rep(NA, 6)
+price_vec2_AS3 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec2_EU3[i] <- sim_european_put(S0 = S0, K = K, sigma = sigma, r = r_changes[i], n_sim = n_sim, T = T)
+  price_vec2_AS3[i] <- simulate_asian_put(S0 = S0, K = K, sigma = sigma, r = r_changes[i], n_sim = n_sim, T = T)
+}
+
+putplot3 <- qplot(price_vec2_EU3, price_vec2_AS3, xlab = "Pris på europæisk put", ylab = "Pris på asiatisk put",
+                   main = "Ændring i r")
+
+
+#### Ændringer i sigma ####
+sigma_changes <- c(0.1, 0.15, 0.2, 0.25, 0.3, 0.35)
+price_vec2_EU4 <- rep(NA, 6)
+price_vec2_AS4 <- rep(NA, 6)
+
+for (i in 1:6){
+  price_vec2_EU4[i] <- sim_european_put(S0 = S0, K = K, sigma = sigma_changes[i], r = r, n_sim = n_sim, T = T)
+  price_vec2_AS4[i] <- simulate_asian_put(S0 = S0, K = K, sigma = sigma_changes[i], r = r, n_sim = n_sim, T = T)
+}
+
+putplot4 <- qplot(price_vec2_EU4, price_vec2_AS4, xlab = "Pris på europæisk put", ylab = "Pris på asiatisk put",
+                   main = "Ændring i sigma") 
+
+
+grid.arrange(putplot1, putplot2, putplot3, putplot4)
+
+
+
+
+
+
+
+
+S0 <- 100
+K <- 150
+r <- 0.06
+sigma <- 0.2
+T <- 1
+n_sim <- 5000
+
+simulate_asian_put(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+sim_european_put(S0 = S0, K = K, sigma = sigma, r = r, n_sim = n_sim, T = T)
+
+
+
+
 
