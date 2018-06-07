@@ -20,9 +20,9 @@ B_vas <- (1 / a) * (1 - exp(-a * 1:10))
 x_ij <- rep(1/10, 10)
 
 #Porteføljevægte
-x_beta <- 0
+x_beta <- 9/10
 xS <- 1/10
-xB <- 9/10
+xB <- 0
 
 # simulate short rate paths
 n <- 10000  # MC simulation trials
@@ -249,7 +249,6 @@ for (i in 1:121) {
 meanvector_A
 
 
-
 meanvector_L <- rep(NA, 121)
 for (i in 1:121) {
   meanvector_L[i] <- mean(L_matrix[i,])
@@ -264,6 +263,11 @@ for (j in 1:n) {
   }
 }
 
+meanvector_B_swap <- rep(NA, 121)
+for (i in 1:121) {
+  meanvector_B_swap[i] <- mean(B_swap[i,])
+}
+meanvector_B_swap
 
 
 Loss_swap <- matrix(NA, 109, n)
@@ -272,7 +276,6 @@ for (j in 1:n) {
     Loss_swap[i,j] <- B_swap[i,j] - exp(-mean((r[i:(i+11),j])))*B_swap[i+12,j]
   }
 }
-
 
 
 meanvector_Loss_swap <- rep(NA, 109)
@@ -286,9 +289,7 @@ qs <- apply(Loss_swap, 1, quantile, probs=c(0.005, 0.5, 0.995))
 quantiles <- t(rbind(qs,meanvector_Loss_swap))
 
 SCR_swap <- quantiles[,3]
-
 CR_swap <- matrix(NA, 109, n)
-
 
 for (j in 1:n) {
   for (i in 1:109) {
@@ -296,11 +297,11 @@ for (j in 1:n) {
   }
 }
 
-CR_swap[1,]
-meanvector_CR <- rep(NA, 109)
+meanvector_CR_swap <- rep(NA, 109)
 for (i in 1:109) {
-  meanvector_CR[i] <- mean(CR_swap[i,])
+  meanvector_CR_swap[i] <- mean(CR_swap[i,])
 }
+meanvector_CR_swap
 
 
 
@@ -314,17 +315,53 @@ for (j in 1:n) {
   }
 }
 
-sum(true_false_matrix_swap[2,])
+sum(true_false_matrix_swap[109,])
 
-insolv_prob <- rep(NA, 109)
+
+insolv_prob_swap <- rep(NA, 109)
 for (i in 1:109) {
-  insolv_prob[i] <- sum(true_false_matrix_swap[i,])/n  
+  insolv_prob_swap[i] <- sum(true_false_matrix_swap[i,])/n  
 }
 
-ins_prob_plot <- qplot(time_vector, insolv_prob, xlab = "Tid",
+ins_prob_plot_swap <- qplot(seq(0, 9, 1/12), insolv_prob_swap, xlab = "Tid",
                        ylab = "Sandsynlighed for insolvens", main = "Sandsynlighed for insolvens for ZCB-swap hedge")
 
+plot_SCR_swap <- qplot(seq(0, 9, 1/12), SCR_swap, xlab = "Tid", ylab = "SCR", 
+                       main = "Solvenskapitalkrav for ZCB-swap hedge")
 
+
+qs_swap <- apply(B_swap, 1, quantile, probs=c(0.005, 0.5, 0.995))
+quantiles_swap <- t(rbind(qs_swap,meanvector_B_swap))
+colnames(quantiles) <- c("0.5%","50%", "99.5%","Mean")
+
+time_vector <- seq(0,T,by=dt)
+data_plot_6.6_swap <- data.frame("time"=time_vector, "quantiles" = quantiles_swap)
+data_plot_6.6_swap <- melt(data_plot_6.6_swap,  id = c('time'))
+
+plot_6.6_swap <- ggplot(data_plot_6.6_swap, aes(time, value)) +
+  geom_line(aes(colour = variable)) +
+  ggtitle("Fraktilplot for B(t) for ZCB-swap hedge") +
+  scale_color_hue(name = "Fraktiler",labels = c("0.5%","50%", "99.5%","Mean"))
+
+plot_6.6_swap
+
+qs <- apply(CR_swap, 1, quantile, probs=c(0.005, 0.5, 0.995))
+quantiles<-t(rbind(qs,meanvector_CR_swap))
+colnames(quantiles)<-c("0.5%","50%", "99.5%","Mean")
+
+time_vector <- seq(0,T-1,by=dt)
+data_plot_CR_swap <- data.frame("time"=time_vector, "quantiles" = quantiles)
+data_plot_CR_swap <- melt(data_plot_CR_swap,  id = c('time'))
+
+plot_CR_swap <- ggplot(data_plot_CR_swap, aes(time, value)) +
+  geom_line(aes(colour = variable)) +
+  ggtitle("Fraktilplot af CR(t) for ZCB-swap hedge") +
+  scale_color_hue(name = "Fraktiler",labels = c("0.5%","50%", "99.5%","Mean"))
+
+plot_CR_swap
+
+
+grid.arrange(plot_6.6_swap, plot_SCR_swap, plot_CR_swap, ins_prob_plot_swap)
 
 
 # Plot of asset distributions (6.3)

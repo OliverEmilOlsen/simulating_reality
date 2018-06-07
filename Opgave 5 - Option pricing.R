@@ -431,6 +431,12 @@ grid.arrange(putplot1, putplot2, putplot3, putplot4)
 
 
 
+
+
+
+
+
+
 S0 <- 100
 K <- 150
 r <- 0.06
